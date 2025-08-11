@@ -18,19 +18,16 @@ using namespace ns3;
 
 // Callback to print energy status
 static void
-PrintEnergyStatus (Ptr<CompositeEnergySource> compositeEnergy)
+PrintEnergyStatus (Ptr<LiIonEnergySource> source)
 {
-  Ptr<LiIonEnergySource> battery = compositeEnergy->GetBattery ();
   std::cout << "Time: " << Simulator::Now ().GetSeconds ()
-            << "s, Voltage: " << battery->GetSupplyVoltage ()
-            << "V, Remaining Energy: " << battery->GetRemainingEnergy ()
-            << "J (" << (battery->GetRemainingEnergy () / (3.6 * 1000)) << " Ah)"
-            << std::endl;
+            << "s, Voltage: " << source->GetSupplyVoltage ()
+            << "V, Remaining Energy: " << source->GetRemainingEnergy ()
+            << " J" << std::endl;
 
   if (!Simulator::IsFinished ())
     {
-      // Schedule the next print in 20 seconds
-      Simulator::Schedule (Seconds (20), &PrintEnergyStatus, compositeEnergy);
+      Simulator::Schedule (Seconds (20), &PrintEnergyStatus, source);
     }
 }
 
@@ -98,28 +95,27 @@ main (int argc, char *argv[])
       battery->SetAttribute ("PeriodicEnergyUpdateInterval", TimeValue (Seconds (1)));
 
       // Create and configure CompositeEnergySource for Satellite
-      Ptr<CompositeEnergySource> compositeEnergy = CreateObject<CompositeEnergySource> ();
-      compositeEnergy->AddBattery (battery);
+      Ptr<CompositeEnergySource> source = CreateObject<CompositeEnergySource> ();
       // Configure LEO cycle harvesting (sunlight/shadow) or fixed window
-      compositeEnergy->SetAttribute ("UseLeoCycle", BooleanValue (true));
-      compositeEnergy->SetAttribute ("PanelAreaM2", DoubleValue (2.0));
-      compositeEnergy->SetAttribute ("PanelEfficiency", DoubleValue (0.28));
-      compositeEnergy->SetAttribute ("SolarConstantWm2", DoubleValue (1361.0));
-      compositeEnergy->SetAttribute ("SunlightSeconds", DoubleValue (3900.0));
-      compositeEnergy->SetAttribute ("ShadowSeconds", DoubleValue (1800.0));
-      compositeEnergy->SetAttribute ("HarvestIntervalSeconds", DoubleValue (1.0));
+      source->SetAttribute ("UseLeoCycle", BooleanValue (true));
+      source->SetAttribute ("PanelAreaM2", DoubleValue (2.0));
+      source->SetAttribute ("PanelEfficiency", DoubleValue (0.28));
+      source->SetAttribute ("SolarConstantWm2", DoubleValue (1361.0));
+      source->SetAttribute ("SunlightSeconds", DoubleValue (3900.0));
+      source->SetAttribute ("ShadowSeconds", DoubleValue (1800.0));
+      source->SetAttribute ("HarvestIntervalSeconds", DoubleValue (1.0));
       // Alternatively, to use a fixed harvesting window, uncomment:
-      // compositeEnergy->SetAttribute ("UseLeoCycle", BooleanValue (false));
-      // compositeEnergy->AddSolarPanel (500.0, 0.0, 1200.0);
+      // source->SetAttribute ("UseLeoCycle", BooleanValue (false));
+      // source->AddSolarPanelWindow (500.0, 0.0, 1200.0);
 
-      // Create and configure SimpleDeviceEnergyModel for Satellite
+      // Attach a SimpleDeviceEnergyModel directly to the CompositeEnergySource (subclass of LiIon)
       Ptr<SimpleDeviceEnergyModel> deviceEnergyModel = CreateObject<SimpleDeviceEnergyModel> ();
-      deviceEnergyModel->SetEnergySource (compositeEnergy);
+      deviceEnergyModel->SetEnergySource (source);
       deviceEnergyModel->SetNode (node);
 
       // Aggregate EnergySourceContainer with the node
       Ptr<EnergySourceContainer> energySourceContainer = CreateObject<EnergySourceContainer> ();
-      energySourceContainer->Add (compositeEnergy);
+      energySourceContainer->Add (source);
       node->AggregateObject (energySourceContainer);
     }
 
@@ -128,8 +124,8 @@ main (int argc, char *argv[])
     {
       Ptr<Node> node = satellites.Get (i);
       Ptr<EnergySourceContainer> energySourceContainer = node->GetObject<EnergySourceContainer> ();
-      Ptr<CompositeEnergySource> compositeEnergy = energySourceContainer->Get (0)->GetObject<CompositeEnergySource> ();
-      Simulator::Schedule (Seconds (0), &PrintEnergyStatus, compositeEnergy);
+      Ptr<LiIonEnergySource> source = energySourceContainer->Get (0)->GetObject<LiIonEnergySource> ();
+      Simulator::Schedule (Seconds (0), &PrintEnergyStatus, source);
     }
 
   // Example: Schedule some energy-consuming activities
@@ -151,10 +147,9 @@ main (int argc, char *argv[])
     {
       Ptr<Node> node = satellites.Get (i);
       Ptr<EnergySourceContainer> energySourceContainer = node->GetObject<EnergySourceContainer> ();
-      Ptr<CompositeEnergySource> compositeEnergy = energySourceContainer->Get (0)->GetObject<CompositeEnergySource> ();
-      Ptr<LiIonEnergySource> battery = compositeEnergy->GetBattery ();
+      Ptr<LiIonEnergySource> source = energySourceContainer->Get (0)->GetObject<LiIonEnergySource> ();
       Ptr<SimpleDeviceEnergyModel> deviceEnergyModel = CreateObject<SimpleDeviceEnergyModel> ();
-      deviceEnergyModel->SetEnergySource (compositeEnergy);
+      deviceEnergyModel->SetEnergySource (source);
       deviceEnergyModel->SetNode (node);
 
       // Simulate high-load transmission: 4.66 A from 10s to 2301s

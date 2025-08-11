@@ -2,7 +2,7 @@
 
 #include "ns3/test.h"
 #include "CompositeEnergySource.h"
-#include "ns3/li-ion-energy-source.h"
+#include "ns3/simulator.h"
 
 using namespace ns3;
 
@@ -16,6 +16,7 @@ public:
     : TestSuite ("composite-energy-source", UNIT)
   {
     AddTestCase (new CompositeEnergySourceTest, TestCase::QUICK);
+    AddTestCase (new CompositeEnergySourceLeoCycleTest, TestCase::QUICK);
   }
 };
 
@@ -32,25 +33,55 @@ public:
 
   virtual void DoRun ()
   {
-    // Create battery
-    Ptr<LiIonEnergySource> battery = CreateObject<LiIonEnergySource> ();
-    battery->SetAttribute ("InitialEnergyJ", DoubleValue (2000.0));
-    battery->SetAttribute ("CapacityJ", DoubleValue (2000.0));
+    // Create CompositeEnergySource (subclass of LiIonEnergySource)
+    Ptr<CompositeEnergySource> source = CreateObject<CompositeEnergySource> ();
+    source->SetAttribute ("InitialEnergyJ", DoubleValue (2000.0));
+    source->SetAttribute ("CapacityJ", DoubleValue (2000.0));
+    source->SetAttribute ("UseLeoCycle", BooleanValue (false));
+    source->AddSolarPanelWindow (500.0, 0.0, 10.0); // 500 J/s for 10 s
 
-    // Create CompositeEnergySource
-    Ptr<CompositeEnergySource> compositeEnergy = CreateObject<CompositeEnergySource> ();
-    compositeEnergy->AddBattery (battery);
-    compositeEnergy->SetAttribute ("UseLeoCycle", BooleanValue (false));
-    compositeEnergy->AddSolarPanel (500.0, 0.0, 10.0); // Harvesting from 0s to 10s
+    NS_TEST_ASSERT_MSG_EQ_TOL (source->GetRemainingEnergy (), 2000.0, 1e-9, "Initial energy mismatch");
 
-    // Check initial energy
-    NS_TEST_ASSERT_MSG_EQ (compositeEnergy->GetRemainingEnergy (), 2000.0, "Initial energy mismatch");
-
-    // Simulate energy harvesting
+    Simulator::Stop (Seconds (10.0));
     Simulator::Run ();
+    Simulator::Destroy ();
 
-    // After 10 seconds, harvesting should have stopped
-    NS_TEST_ASSERT_MSG_EQ (compositeEnergy->GetRemainingEnergy (), 2000.0 + (500.0 * 10.0), "Energy harvesting incorrect");
+    NS_TEST_ASSERT_MSG_EQ_TOL (source->GetRemainingEnergy (), 2000.0 + (500.0 * 10.0), 1e-6, "Energy harvesting incorrect");
+  }
+};
+
+// Test LEO cycle: harvest during sunlight segments; no harvest in shadow
+class CompositeEnergySourceLeoCycleTest : public TestCase
+{
+public:
+  CompositeEnergySourceLeoCycleTest ()
+    : TestCase ("CompositeEnergySource LEO cycle test")
+  {
+  }
+
+  virtual void DoRun ()
+  {
+    Ptr<CompositeEnergySource> source = CreateObject<CompositeEnergySource> ();
+    source->SetAttribute ("InitialEnergyJ", DoubleValue (1000.0));
+    source->SetAttribute ("CapacityJ", DoubleValue (10000.0));
+    source->SetAttribute ("UseLeoCycle", BooleanValue (true));
+    source->SetAttribute ("PanelAreaM2", DoubleValue (1.0));
+    source->SetAttribute ("PanelEfficiency", DoubleValue (0.25));
+    source->SetAttribute ("SolarConstantWm2", DoubleValue (1361.0));
+    source->SetAttribute ("HarvestIntervalSeconds", DoubleValue (1.0));
+    source->SetAttribute ("SunlightSeconds", DoubleValue (10.0));
+    source->SetAttribute ("ShadowSeconds", DoubleValue (5.0));
+
+    // Run 30 seconds: sunlight [0,10), shadow [10,15), sunlight [15,25), shadow [25,30)
+    Simulator::Stop (Seconds (30.0));
+    Simulator::Run ();
+    Simulator::Destroy ();
+
+    // Expected harvested energy is sunlight_time * solar_power
+    const double p = 1361.0 * 1.0 * 0.25; // W == J/s
+    const double sunlightTotal = 10.0 + 10.0; // 20 seconds sunlight
+    const double expected = 1000.0 + p * sunlightTotal;
+    NS_TEST_ASSERT_MSG_EQ_TOL (source->GetRemainingEnergy (), expected, 1e-6, "LEO cycle harvesting incorrect");
   }
 };
 
