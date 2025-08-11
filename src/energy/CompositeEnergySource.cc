@@ -14,14 +14,57 @@ CompositeEnergySource::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::CompositeEnergySource")
     .SetParent<EnergySource> ()
     .SetGroupName("Energy")
-    .AddConstructor<CompositeEnergySource> ();
+    .AddConstructor<CompositeEnergySource> ()
+    .AddAttribute ("UseLeoCycle",
+                   "Enable repeating sunlight/shadow LEO cycle.",
+                   BooleanValue (true),
+                   MakeBooleanAccessor (&CompositeEnergySource::m_useLeoCycle),
+                   MakeBooleanChecker ())
+    .AddAttribute ("PanelAreaM2",
+                   "Solar panel area (m^2).",
+                   DoubleValue (2.0),
+                   MakeDoubleAccessor (&CompositeEnergySource::m_panelAreaM2),
+                   MakeDoubleChecker<double> (0.0))
+    .AddAttribute ("PanelEfficiency",
+                   "Panel efficiency (0..1).",
+                   DoubleValue (0.28),
+                   MakeDoubleAccessor (&CompositeEnergySource::m_panelEfficiency),
+                   MakeDoubleChecker<double> (0.0, 1.0))
+    .AddAttribute ("SolarConstantWm2",
+                   "Solar constant (W/m^2).",
+                   DoubleValue (1361.0),
+                   MakeDoubleAccessor (&CompositeEnergySource::m_solarConstantWm2),
+                   MakeDoubleChecker<double> (0.0))
+    .AddAttribute ("HarvestIntervalSeconds",
+                   "Numerical integration step for harvesting (s).",
+                   DoubleValue (1.0),
+                   MakeDoubleAccessor (&CompositeEnergySource::m_harvestIntervalSeconds),
+                   MakeDoubleChecker<double> (1e-6))
+    .AddAttribute ("SunlightSeconds",
+                   "Duration of sunlight per cycle (s).",
+                   DoubleValue (3900.0),
+                   MakeDoubleAccessor (&CompositeEnergySource::m_sunlightSeconds),
+                   MakeDoubleChecker<double> (0.0))
+    .AddAttribute ("ShadowSeconds",
+                   "Duration of umbra per cycle (s).",
+                   DoubleValue (1800.0),
+                   MakeDoubleAccessor (&CompositeEnergySource::m_shadowSeconds),
+                   MakeDoubleChecker<double> (0.0));
   return tid;
 }
 
 CompositeEnergySource::CompositeEnergySource ()
   : m_solarPower (0.0),
     m_harvestStart (0.0),
-    m_harvestEnd (0.0)
+    m_harvestEnd (0.0),
+    m_useLeoCycle (true),
+    m_panelAreaM2 (2.0),
+    m_panelEfficiency (0.28),
+    m_solarConstantWm2 (1361.0),
+    m_harvestIntervalSeconds (1.0),
+    m_sunlightSeconds (3900.0),
+    m_shadowSeconds (1800.0),
+    m_inSunlight (true)
 {
 }
 
@@ -46,6 +89,15 @@ CompositeEnergySource::AddSolarPanel (double powerJoulePerSecond, double startTi
 
   // Schedule the start of energy harvesting
   Simulator::Schedule (Seconds (m_harvestStart), &CompositeEnergySource::HarvestEnergy, this);
+}
+
+void
+CompositeEnergySource::ConfigureSolarHarvester (double panelAreaM2, double panelEfficiency, double solarConstantWm2)
+{
+  NS_LOG_FUNCTION (this << panelAreaM2 << panelEfficiency << solarConstantWm2);
+  m_panelAreaM2 = panelAreaM2;
+  m_panelEfficiency = panelEfficiency;
+  m_solarConstantWm2 = solarConstantWm2;
 }
 
 double
@@ -85,27 +137,72 @@ CompositeEnergySource::GetBattery () const
 }
 
 void
+CompositeEnergySource::DoInitialize ()
+{
+  // If using LEO cycle, start it; otherwise rely on explicit AddSolarPanel window.
+  if (m_useLeoCycle)
+    {
+      StartHarvestCycle ();
+    }
+  EnergySource::DoInitialize ();
+}
+
+void
+CompositeEnergySource::StartHarvestCycle ()
+{
+  // Start in sunlight; schedule harvesting and toggle to shadow later
+  m_inSunlight = true;
+  // kick off harvesting loop immediately
+  if (!m_harvestEvent.IsRunning ())
+    {
+      m_harvestEvent = Simulator::ScheduleNow (&CompositeEnergySource::HarvestEnergy, this);
+    }
+  // schedule toggle to shadow
+  m_toggleEvent = Simulator::Schedule (Seconds (m_sunlightSeconds), &CompositeEnergySource::ToggleSunlight, this);
+}
+
+void
+CompositeEnergySource::ToggleSunlight ()
+{
+  m_inSunlight = !m_inSunlight;
+  double next = m_inSunlight ? m_sunlightSeconds : m_shadowSeconds;
+  m_toggleEvent = Simulator::Schedule (Seconds (next), &CompositeEnergySource::ToggleSunlight, this);
+}
+
+void
 CompositeEnergySource::HarvestEnergy ()
 {
   NS_LOG_FUNCTION (this);
   double currentTime = Simulator::Now ().GetSeconds ();
-  
-  if (currentTime >= m_harvestStart && currentTime < m_harvestEnd)
+
+  double dt = m_harvestIntervalSeconds;
+  bool windowActive = (currentTime >= m_harvestStart && currentTime < m_harvestEnd);
+
+  double harvestedJ = 0.0;
+  if (m_useLeoCycle)
     {
-      // Add harvested energy to the battery
-      if (m_battery)
+      if (m_inSunlight)
         {
-          m_battery->AddEnergy (m_solarPower); // Assuming 1-second interval
-          NS_LOG_INFO ("Harvested " << m_solarPower << " J at " << currentTime << "s");
+          // Compute instantaneous solar power from panel and efficiency
+          double p = m_solarConstantWm2 * m_panelAreaM2 * m_panelEfficiency; // W == J/s
+          harvestedJ = p * dt;
         }
-      
-      // Schedule next harvesting event after 1 second
-      Simulator::Schedule (Seconds (1.0), &CompositeEnergySource::HarvestEnergy, this);
     }
-  else
+  else if (windowActive && m_solarPower > 0.0)
     {
-      NS_LOG_INFO ("Energy harvesting ended at " << currentTime << "s");
-      // Harvesting period ended; do nothing or handle multiple periods if needed
+      harvestedJ = m_solarPower * dt;
+    }
+
+  if (harvestedJ > 0.0 && m_battery)
+    {
+      TryAddEnergy (m_battery, harvestedJ);
+      NS_LOG_INFO ("Harvested " << harvestedJ << " J at t=" << currentTime << "s");
+    }
+
+  // Continue loop if either LEO cycle is on or explicit window still active
+  if (m_useLeoCycle || (windowActive && m_solarPower > 0.0))
+    {
+      m_harvestEvent = Simulator::Schedule (Seconds (dt), &CompositeEnergySource::HarvestEnergy, this);
     }
 }
 

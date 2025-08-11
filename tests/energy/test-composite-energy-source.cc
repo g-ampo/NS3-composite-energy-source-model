@@ -1,7 +1,7 @@
 // tests/energy/test-composite-energy-source.cc
 
 #include "ns3/test.h"
-#include "ns3/composite-energy-source.h"
+#include "CompositeEnergySource.h"
 #include "ns3/li-ion-energy-source.h"
 
 using namespace ns3;
@@ -40,6 +40,7 @@ public:
     // Create CompositeEnergySource
     Ptr<CompositeEnergySource> compositeEnergy = CreateObject<CompositeEnergySource> ();
     compositeEnergy->AddBattery (battery);
+    compositeEnergy->SetAttribute ("UseLeoCycle", BooleanValue (false));
     compositeEnergy->AddSolarPanel (500.0, 0.0, 10.0); // Harvesting from 0s to 10s
 
     // Check initial energy

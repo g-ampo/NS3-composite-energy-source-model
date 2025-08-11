@@ -100,7 +100,17 @@ main (int argc, char *argv[])
       // Create and configure CompositeEnergySource for Satellite
       Ptr<CompositeEnergySource> compositeEnergy = CreateObject<CompositeEnergySource> ();
       compositeEnergy->AddBattery (battery);
-      compositeEnergy->AddSolarPanel (500.0, 0.0, 1200.0); // 500 J/s from 0s to 1200s
+      // Configure LEO cycle harvesting (sunlight/shadow) or fixed window
+      compositeEnergy->SetAttribute ("UseLeoCycle", BooleanValue (true));
+      compositeEnergy->SetAttribute ("PanelAreaM2", DoubleValue (2.0));
+      compositeEnergy->SetAttribute ("PanelEfficiency", DoubleValue (0.28));
+      compositeEnergy->SetAttribute ("SolarConstantWm2", DoubleValue (1361.0));
+      compositeEnergy->SetAttribute ("SunlightSeconds", DoubleValue (3900.0));
+      compositeEnergy->SetAttribute ("ShadowSeconds", DoubleValue (1800.0));
+      compositeEnergy->SetAttribute ("HarvestIntervalSeconds", DoubleValue (1.0));
+      // Alternatively, to use a fixed harvesting window, uncomment:
+      // compositeEnergy->SetAttribute ("UseLeoCycle", BooleanValue (false));
+      // compositeEnergy->AddSolarPanel (500.0, 0.0, 1200.0);
 
       // Create and configure SimpleDeviceEnergyModel for Satellite
       Ptr<SimpleDeviceEnergyModel> deviceEnergyModel = CreateObject<SimpleDeviceEnergyModel> ();
@@ -143,7 +153,9 @@ main (int argc, char *argv[])
       Ptr<EnergySourceContainer> energySourceContainer = node->GetObject<EnergySourceContainer> ();
       Ptr<CompositeEnergySource> compositeEnergy = energySourceContainer->Get (0)->GetObject<CompositeEnergySource> ();
       Ptr<LiIonEnergySource> battery = compositeEnergy->GetBattery ();
-      Ptr<SimpleDeviceEnergyModel> deviceEnergyModel = compositeEnergy->GetDeviceEnergyModel ();
+      Ptr<SimpleDeviceEnergyModel> deviceEnergyModel = CreateObject<SimpleDeviceEnergyModel> ();
+      deviceEnergyModel->SetEnergySource (compositeEnergy);
+      deviceEnergyModel->SetNode (node);
 
       // Simulate high-load transmission: 4.66 A from 10s to 2301s
       Simulator::Schedule (Seconds (10), &SimpleDeviceEnergyModel::SetCurrentA, deviceEnergyModel, 4.66); // Start high-load transmission

@@ -43,7 +43,7 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
    cp -r .github/ <path-to-ns3>/.github/
    ```
 
-3. **Update `wscript`:**
+3. **Update `wscript`:** (waf)
 
    Ensure that ns-3 recognizes the new energy models by updating the `wscript` file in the `src/energy/` directory.
 
@@ -51,15 +51,9 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
    # src/energy/wscript
 
    def build(bld):
-       bld.ns3_add_library("energy",
-                           ["CompositeEnergySource.cc"],
-                           ["CompositeEnergySource.h",
-                            "li-ion-energy-source.h",
-                            "energy-source.h",
-                            "energy-source-container.h",
-                            "simple-device-energy-model.h"],
-                           includes=["."],
-                           )
+        # Add the new composite energy source into the existing energy library
+        bld.source += [ 'src/energy/CompositeEnergySource.cc' ]
+        bld.includes += [ 'src/energy' ]
 
        bld.ns3_add_executable("composite-energy-model-example",
                               ["../examples/energy/composite-energy-model-example.cc"],
@@ -68,7 +62,21 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
                               )
    ```
 
-4. **Build the Project:**
+4. **Attributes (LEO cycle):**
+
+   The `ns3::CompositeEnergySource` exposes attributes to model a LEO sunlight/umbra cycle:
+
+   - `UseLeoCycle` (bool, default true): enable sunlight/shadow cycling
+   - `PanelAreaM2` (double): solar panel area in m^2
+   - `PanelEfficiency` (double): panel efficiency [0..1]
+   - `SolarConstantWm2` (double): solar constant (default 1361 W/m^2)
+   - `HarvestIntervalSeconds` (double): integration step for harvesting in seconds
+   - `SunlightSeconds` (double): sunlight duration per cycle (s)
+   - `ShadowSeconds` (double): shadow duration per cycle (s)
+
+   Alternatively, a fixed harvesting window can be set via `AddSolarPanel(powerJps, start, end)` with `UseLeoCycle=false`.
+
+5. **Build the Project:**
 
    Navigate to the ns-3 root directory and build the project.
 
@@ -77,12 +85,24 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
    ./waf build
    ```
 
-5. **Run Example Simulations:**
+6. **Run Example Simulations:**
 
    Execute the example simulation to verify the setup.
 
    ```bash
    ./waf --run energy/composite-energy-model-example
+
+### Example snippet
+
+```cpp
+Ptr<CompositeEnergySource> ces = CreateObject<CompositeEnergySource>();
+ces->AddBattery(battery);
+ces->SetAttribute("UseLeoCycle", BooleanValue(true));
+ces->SetAttribute("PanelAreaM2", DoubleValue(2.0));
+ces->SetAttribute("PanelEfficiency", DoubleValue(0.28));
+ces->SetAttribute("SunlightSeconds", DoubleValue(3900.0));
+ces->SetAttribute("ShadowSeconds", DoubleValue(1800.0));
+```
    ```
 
 ## Usage
