@@ -169,18 +169,6 @@ This section provides an overview of each class within the project, detailing th
 - **Description:**
   The `CompositeEnergySourceTest` class contains unit tests designed to verify the correctness and reliability of the `CompositeEnergySource` implementation. It tests functionalities such as energy harvesting, correct energy addition over time, and proper integration with the battery component.
 
-## Contributing
-
-We welcome contributions! Please read our [Contributing Guidelines](docs/contributing.md) before submitting a pull request.
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
-## Acknowledgments
-
-- **ns-3 Team:** For the excellent simulation framework.
-- **Community Contributors:** For their valuable feedback and support.
 
 ---
 
@@ -198,3 +186,24 @@ To execute the unit tests and ensure that all components are functioning correct
 ## Contact
 
 For questions, suggestions, or support, please open an issue in the this repo or contact me diretly.
+
+## Cite as
+
+IEEE:
+
+```
+G. Amponis, “NS-3 Composite Energy Source Model,” 2025, GitHub. Available: https://github.com/g-ampo/NS3-composite-energy-source-model
+```
+
+BibTeX:
+
+```bibtex
+@misc{Amponis2025NS3CompositeEnergy,
+  title        = {NS-3 Composite Energy Source Model},
+  author       = {Amponis, George},
+  year         = {2025},
+  howpublished = {Software},
+  note         = {Implements a Li-Ion energy source with solar harvesting (LEO cycle and fixed window) for ns-3},
+  url          = {https://github.com/g-ampo/NS3-composite-energy-source-model}
+}
+```
