@@ -74,7 +74,7 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
    - `SunlightSeconds` (double): sunlight duration per cycle (s)
    - `ShadowSeconds` (double): shadow duration per cycle (s)
 
-   Alternatively, a fixed harvesting window can be set via `AddSolarPanel(powerJps, start, end)` with `UseLeoCycle=false`.
+   Alternatively, a fixed harvesting window can be set via `AddSolarPanelWindow(powerJps, start, end)` with `UseLeoCycle=false`.
 
 5. **Build the Project:**
 
@@ -92,11 +92,27 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
    ```bash
    ./waf --run energy/composite-energy-model-example
 
+### Class Diagram (ASCII)
+
+```
+ns3::EnergySource
+    ^
+    |
+    +-- ns3::LiIonEnergySource
+            ^
+            |
+            +-- ns3::CompositeEnergySource
+                    - Attributes: UseLeoCycle, PanelAreaM2, PanelEfficiency,
+                                  SolarConstantWm2, SunlightSeconds, ShadowSeconds,
+                                  HarvestIntervalSeconds
+                    - Methods: ConfigureSolarHarvester(), AddSolarPanelWindow()
+                    - Behavior: ChangeRemainingEnergy(+J) during sunlight/window
+```
+
 ### Example snippet
 
 ```cpp
 Ptr<CompositeEnergySource> ces = CreateObject<CompositeEnergySource>();
-ces->AddBattery(battery);
 ces->SetAttribute("UseLeoCycle", BooleanValue(true));
 ces->SetAttribute("PanelAreaM2", DoubleValue(2.0));
 ces->SetAttribute("PanelEfficiency", DoubleValue(0.28));
@@ -115,7 +131,7 @@ This section provides an overview of each class within the project, detailing th
 
 | **Class Name**               | **Inherits From**        | **Description**                                                                                          |
 |------------------------------|--------------------------|----------------------------------------------------------------------------------------------------------|
-| **CompositeEnergySource**    | `ns3::EnergySource`      | Combines a `LiIonEnergySource` with solar energy harvesting capabilities, enabling Satellites to replenish energy periodically from solar panels. |
+| **CompositeEnergySource**    | `ns3::LiIonEnergySource` | Li-Ion battery with solar harvesting (LEO cycle or fixed window). DeviceEnergyModel attaches directly. |
 | **LiIonEnergySource**        | `ns3::EnergySource`      | Represents a lithium-ion battery energy source, managing energy storage and consumption for UAVs and Satellites. |
 | **SimpleDeviceEnergyModel**  | `ns3::DeviceEnergyModel` | Simulates energy consumption for device activities such as transmission, reception, and idle states.      |
 | **CompositeEnergySourceTest**| `ns3::TestCase`          | Contains unit tests to verify the functionality and reliability of the `CompositeEnergySource` class.     |
@@ -126,9 +142,9 @@ This section provides an overview of each class within the project, detailing th
 
 - **Header File:** `src/energy/CompositeEnergySource.h`
 - **Source File:** `src/energy/CompositeEnergySource.cc`
-- **Inheritance:** Inherits from `ns3::EnergySource`.
+- **Inheritance:** Inherits from `ns3::LiIonEnergySource`.
 - **Description:** 
-  The `CompositeEnergySource` class is a custom energy source that integrates a `LiIonEnergySource` with solar energy harvesting capabilities. This enables Satellites within the simulation to periodically replenish their energy from solar panels, thereby extending their operational lifespan. The class manages the timing and rate of energy harvesting, ensuring that energy is added to the battery within specified intervals.
+  The `CompositeEnergySource` class is a Li-Ion energy source that adds solar harvesting. Satellites can replenish energy via LEO sunlight/shadow cycles or a fixed window. Discharge/voltage/capacity remain handled by the base Li-Ion implementation, while harvesting injects energy using `ChangeRemainingEnergy(+J)`.
 
 #### LiIonEnergySource
 

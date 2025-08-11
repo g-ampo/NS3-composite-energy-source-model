@@ -11,8 +11,9 @@ NS_OBJECT_ENSURE_REGISTERED (CompositeEnergySource);
 TypeId
 CompositeEnergySource::GetTypeId (void)
 {
+  // Inherit from LiIonEnergySource to allow direct attachment of DeviceEnergyModel
   static TypeId tid = TypeId ("ns3::CompositeEnergySource")
-    .SetParent<EnergySource> ()
+    .SetParent<LiIonEnergySource> ()
     .SetGroupName("Energy")
     .AddConstructor<CompositeEnergySource> ()
     .AddAttribute ("UseLeoCycle",
@@ -70,6 +71,7 @@ CompositeEnergySource::CompositeEnergySource ()
 
 CompositeEnergySource::~CompositeEnergySource ()
 {
+  // Cancel any outstanding events on destruction
   if (m_harvestEvent.IsRunning ())
     {
       Simulator::Cancel (m_harvestEvent);
@@ -80,15 +82,9 @@ CompositeEnergySource::~CompositeEnergySource ()
     }
 }
 
+// Configure a fixed harvesting window (ignored if LEO cycle is in use)
 void
-CompositeEnergySource::AddBattery (Ptr<LiIonEnergySource> battery)
-{
-  NS_LOG_FUNCTION (this << battery);
-  m_battery = battery;
-}
-
-void
-CompositeEnergySource::AddSolarPanel (double powerJoulePerSecond, double startTime, double endTime)
+CompositeEnergySource::AddSolarPanelWindow (double powerJoulePerSecond, double startTime, double endTime)
 {
   NS_LOG_FUNCTION (this << powerJoulePerSecond << startTime << endTime);
   m_solarPower = powerJoulePerSecond;
@@ -111,51 +107,17 @@ CompositeEnergySource::ConfigureSolarHarvester (double panelAreaM2, double panel
   m_solarConstantWm2 = solarConstantWm2;
 }
 
-double
-CompositeEnergySource::GetRemainingEnergy () const
-{
-  NS_LOG_FUNCTION (this);
-  if (m_battery)
-    return m_battery->GetRemainingEnergy ();
-  else
-    return 0.0;
-}
-
-double
-CompositeEnergySource::GetTotalEnergy () const
-{
-  NS_LOG_FUNCTION (this);
-  if (m_battery)
-    return m_battery->GetTotalEnergy ();
-  else
-    return 0.0;
-}
-
-double
-CompositeEnergySource::GetSupplyVoltage () const
-{
-  NS_LOG_FUNCTION (this);
-  if (m_battery)
-    return m_battery->GetSupplyVoltage ();
-  else
-    return 0.0;
-}
-
-Ptr<LiIonEnergySource>
-CompositeEnergySource::GetBattery () const
-{
-  return m_battery;
-}
-
 void
 CompositeEnergySource::DoInitialize ()
 {
-  // If using LEO cycle, start it; otherwise rely on explicit AddSolarPanel window.
+  // Initialize base Li-Ion behavior first
+  LiIonEnergySource::DoInitialize ();
+  // If using LEO cycle, start it; otherwise rely on explicit AddSolarPanelWindow.
   if (m_useLeoCycle)
     {
       StartHarvestCycle ();
+
     }
-  EnergySource::DoInitialize ();
 }
 
 void
@@ -204,9 +166,10 @@ CompositeEnergySource::HarvestEnergy ()
       harvestedJ = m_solarPower * dt;
     }
 
-  if (harvestedJ > 0.0 && m_battery)
+  if (harvestedJ > 0.0)
     {
-      TryAddEnergy (m_battery, harvestedJ);
+      // Inject harvested energy into the Li-Ion reserve using base API
+      ChangeRemainingEnergy (harvestedJ);
       NS_LOG_INFO ("Harvested " << harvestedJ << " J at t=" << currentTime << "s");
     }
 

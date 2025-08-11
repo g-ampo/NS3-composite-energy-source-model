@@ -3,8 +3,6 @@
 #ifndef COMPOSITE_ENERGY_SOURCE_H
 #define COMPOSITE_ENERGY_SOURCE_H
 
-#include "ns3/energy-source.h"
-#include "ns3/energy-source-container.h"
 #include "ns3/li-ion-energy-source.h"
 #include "ns3/event-id.h"
 #include "ns3/simulator.h"
@@ -15,12 +13,28 @@
 namespace ns3 {
 
 /**
- * \brief CompositeEnergySource combines a LiIonEnergySource with energy harvesting capabilities.
+ * \brief CompositeEnergySource: Li-Ion battery with solar harvesting staged for LEO.
  *
- * This class allows nodes (e.g., Satellites) to have a battery and periodically harvest energy
- * from renewable sources like solar panels.
+ * Design intent
+ *  - Inherit from ns3::LiIonEnergySource so that existing ns-3 DeviceEnergyModel
+ *    classes can attach directly to this source without any adapter.
+ *  - Add attribute-driven solar harvesting that operates either via a repeating
+ *    sunlight/shadow (LEO) cycle or via a fixed-time harvesting window.
+ *  - Leverage the Li-Ion model for discharge dynamics, voltage, capacity, and
+ *    current/energy accounting, while this subclass only injects harvested energy.
+ *
+ * Usage
+ *  - Create a CompositeEnergySource, set Li-Ion attributes (InitialEnergyJ, CapacityJ,
+ *    voltages, internal resistance, etc.), then set harvesting attributes.
+ *  - Attach a DeviceEnergyModel (e.g., SimpleDeviceEnergyModel) directly to this source
+ *    with SetEnergySource(this) and install it on the node.
+ *
+ * Notes
+ *  - Harvesting adds energy using ChangeRemainingEnergy(+J), while consumption is
+ *    handled by the base Li-Ion class (invoked by DeviceEnergyModel execution).
+ *  - If UseLeoCycle is true, the fixed AddSolarPanelWindow() is ignored.
  */
-class CompositeEnergySource : public EnergySource
+class CompositeEnergySource : public LiIonEnergySource
 {
 public:
   static TypeId GetTypeId (void);
@@ -29,35 +43,18 @@ public:
   virtual ~CompositeEnergySource ();
 
   /**
-   * \brief Add a battery to the composite energy source.
-   * \param battery Ptr to the LiIonEnergySource.
+   * \brief Configure a fixed harvesting window (ignored when UseLeoCycle=true).
+   *        The source will add energy at a constant power (J/s) in [start,end).
    */
-  void AddBattery (Ptr<LiIonEnergySource> battery);
-
-  /**
-   * \brief Add a solar panel energy harvesting mechanism.
-   * \param powerJoulePerSecond Energy harvested per second (J/s).
-   * \param startTime Start time for energy harvesting (seconds).
-   * \param endTime End time for energy harvesting (seconds).
-   */
-  void AddSolarPanel (double powerJoulePerSecond, double startTime, double endTime);
+  void AddSolarPanelWindow (double powerJoulePerSecond, double startTime, double endTime);
 
   /**
    * \brief Configure a solar harvester using panel area and efficiency.
-   * Solar input power (J/s) = solarConstantWm2 * panelAreaM2 * panelEfficiency.
+   *        Instantaneous solar input power (J/s) = SolarConstantWm2 * PanelAreaM2 * PanelEfficiency.
    */
   void ConfigureSolarHarvester (double panelAreaM2, double panelEfficiency, double solarConstantWm2 = 1361.0);
   
-  // Override methods to provide energy information
-  virtual double GetRemainingEnergy () const override;
-  virtual double GetTotalEnergy () const override;
-  virtual double GetSupplyVoltage () const override;
-
-  /**
-   * \brief Get the battery component.
-   * \return Ptr to the LiIonEnergySource.
-   */
-  Ptr<LiIonEnergySource> GetBattery () const;
+  // Li-Ion energy accounting and voltage are handled by the base class.
 
 private:
   // ns-3 lifecycle
@@ -68,24 +65,6 @@ private:
   void StartHarvestCycle ();
   void ToggleSunlight (); // switch sunlight/shadow in LEO cycle
 
-  // Helper to add energy to the underlying battery regardless of API naming
-  template <typename T>
-  static auto TryAddEnergyImpl (T* batt, double j, int) -> decltype(batt->AddEnergy(j), void())
-  {
-    batt->AddEnergy (j);
-  }
-  template <typename T>
-  static auto TryAddEnergyImpl (T* batt, double j, long) -> decltype(batt->ChangeRemainingEnergy(j), void())
-  {
-    batt->ChangeRemainingEnergy (j);
-  }
-  static void TryAddEnergy (Ptr<LiIonEnergySource> batt, double j)
-  {
-    if (!batt) return;
-    TryAddEnergyImpl (PeekPointer(batt), j, 0);
-  }
-
-  Ptr<LiIonEnergySource> m_battery;    ///< Battery component
   double m_solarPower;                  ///< Explicit harvested power (J/s)
   EventId m_harvestEvent;               ///< Event ID for harvesting
   double m_harvestStart;                ///< Harvest start time (s) for explicit window
