@@ -92,7 +92,7 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
    ```bash
    ./waf --run energy/composite-energy-model-example
 
-### Class Diagram (ASCII)
+### Class Diagram
 
 ```
 ns3::EnergySource
@@ -119,11 +119,6 @@ ces->SetAttribute("PanelEfficiency", DoubleValue(0.28));
 ces->SetAttribute("SunlightSeconds", DoubleValue(3900.0));
 ces->SetAttribute("ShadowSeconds", DoubleValue(1800.0));
 ```
-   
-
-## Usage
-
-Refer to the [Usage Guide](docs/usage.md) for detailed instructions on configuring and utilizing the energy models within your simulations.
 
 ## Class Descriptions
 
