@@ -103,7 +103,7 @@ ces->SetAttribute("PanelEfficiency", DoubleValue(0.28));
 ces->SetAttribute("SunlightSeconds", DoubleValue(3900.0));
 ces->SetAttribute("ShadowSeconds", DoubleValue(1800.0));
 ```
-   ```
+   
 
 ## Usage
 
