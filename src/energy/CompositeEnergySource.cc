@@ -70,6 +70,14 @@ CompositeEnergySource::CompositeEnergySource ()
 
 CompositeEnergySource::~CompositeEnergySource ()
 {
+  if (m_harvestEvent.IsRunning ())
+    {
+      Simulator::Cancel (m_harvestEvent);
+    }
+  if (m_toggleEvent.IsRunning ())
+    {
+      Simulator::Cancel (m_toggleEvent);
+    }
 }
 
 void
@@ -87,8 +95,11 @@ CompositeEnergySource::AddSolarPanel (double powerJoulePerSecond, double startTi
   m_harvestStart = startTime;
   m_harvestEnd = endTime;
 
-  // Schedule the start of energy harvesting
-  Simulator::Schedule (Seconds (m_harvestStart), &CompositeEnergySource::HarvestEnergy, this);
+  // If LEO cycle is disabled, schedule explicit window harvesting; otherwise, LEO cycle will drive harvesting
+  if (!m_useLeoCycle)
+    {
+      Simulator::Schedule (Seconds (m_harvestStart), &CompositeEnergySource::HarvestEnergy, this);
+    }
 }
 
 void
