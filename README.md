@@ -26,7 +26,7 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
 1. **Clone the Repository:**
 
    ```bash
-   git clone https://github.com/yourusername/ns3-composite-energy-model.git
+   git clone https://github.com/g-ampo/ns3-composite-energy-model.git
    cd ns3-composite-energy-model
    ```
 
