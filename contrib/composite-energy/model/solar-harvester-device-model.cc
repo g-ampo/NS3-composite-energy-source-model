@@ -24,6 +24,7 @@ SolarHarvesterDeviceModel::GetTypeId()
 SolarHarvesterDeviceModel::SolarHarvesterDeviceModel()
     : m_source(nullptr),
       m_harvestCurrentA(0.0),
+      m_harvestPowerW(0.0),
       m_totalHarvestedJ(0.0),
       m_lastUpdate(Seconds(0))
 {
@@ -94,8 +95,14 @@ SolarHarvesterDeviceModel::SetHarvestCurrentA(double a)
     {
         a = 0.0;
     }
+    // Integrate the previous power over [m_lastUpdate, now] *before*
+    // overwriting state so m_totalHarvestedJ stays consistent.
     AccrueSinceLastUpdate();
     m_harvestCurrentA = a;
+    // Capture the effective injected power using the supply voltage at the
+    // time we switched to this current. This decouples our bookkeeping from
+    // subsequent voltage drift inside the Li-Ion model.
+    m_harvestPowerW = (m_source && a > 0.0) ? a * m_source->GetSupplyVoltage() : 0.0;
 }
 
 double
@@ -131,10 +138,9 @@ SolarHarvesterDeviceModel::AccrueSinceLastUpdate()
 {
     Time now = Simulator::Now();
     double dt = (now - m_lastUpdate).GetSeconds();
-    if (dt > 0.0 && m_harvestCurrentA > 0.0 && m_source)
+    if (dt > 0.0 && m_harvestPowerW > 0.0)
     {
-        double v = m_source->GetSupplyVoltage();
-        m_totalHarvestedJ += m_harvestCurrentA * v * dt;
+        m_totalHarvestedJ += m_harvestPowerW * dt;
     }
     m_lastUpdate = now;
 }

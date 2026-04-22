@@ -64,15 +64,17 @@ class SolarHarvesterDeviceModel : public DeviceEnergyModel
 
   private:
     /**
-     * Integrate P*dt since the last update into m_totalHarvestedJ using the
-     * current supply voltage and the previously-set harvest current. Called
-     * before any transition that changes the reported current so that the
-     * bookkeeping total reflects the full rectangular integral.
+     * Integrate P_prev * dt into m_totalHarvestedJ, where P_prev is the
+     * power that was effectively in force since the previous call (i.e. the
+     * product of the previously-set harvest current and the supply voltage
+     * captured at that time). This gives an exact rectangular integral,
+     * independent of any supply-voltage drift inside the battery model.
      */
     void AccrueSinceLastUpdate();
 
     Ptr<EnergySource> m_source;
-    double m_harvestCurrentA;
+    double m_harvestCurrentA; // magnitude; reported as -m_harvestCurrentA
+    double m_harvestPowerW;   // = m_harvestCurrentA * V at time of setter
     double m_totalHarvestedJ;
     Time m_lastUpdate;
 };

@@ -175,9 +175,12 @@ CompositeEnergySource::ToggleSunlight()
 {
     NS_LOG_FUNCTION(this);
     m_inSunlight = !m_inSunlight;
-    // Apply the new phase immediately so the harvester current reflects
-    // the transition without waiting up to HarvestIntervalSeconds.
-    UpdateHarvestCurrent();
+    // We deliberately do NOT call UpdateHarvestCurrent() inline here: the
+    // periodic harvest tick (UID strictly greater than ours for same simtime)
+    // will pick up the new phase on its next firing. Calling it inline would
+    // reschedule m_harvestEvent in addition to the already-queued self-
+    // reschedule from the previous tick, producing duplicate events that
+    // compound each cycle.
     double next = m_inSunlight ? m_sunlightSeconds : m_shadowSeconds;
     m_toggleEvent =
         Simulator::Schedule(Seconds(next), &CompositeEnergySource::ToggleSunlight, this);
