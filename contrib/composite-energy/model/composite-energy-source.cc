@@ -1,7 +1,10 @@
-// CompositeEnergySource.cc
+#include "composite-energy-source.h"
 
-#include "CompositeEnergySource.h"
+#include "ns3/boolean.h"
+#include "ns3/double.h"
 #include "ns3/log.h"
+#include "ns3/nstime.h"
+#include "ns3/simulator.h"
 
 namespace ns3 {
 

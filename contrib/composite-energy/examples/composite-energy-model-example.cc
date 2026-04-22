@@ -1,5 +1,3 @@
-// examples/energy/composite-energy-model-example.cc
-
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * CompositeEnergySource Example for UAVs and Satellites
@@ -7,12 +5,12 @@
  * Satellites: Battery-powered with periodic solar energy harvesting
  */
 
+#include "ns3/composite-energy-module.h"
 #include "ns3/core-module.h"
-#include "ns3/network-module.h"
 #include "ns3/energy-module.h"
 #include "ns3/mobility-module.h"
+#include "ns3/network-module.h"
 #include "ns3/wifi-module.h"
-#include "CompositeEnergySource.h" // Custom CompositeEnergySource
 
 using namespace ns3;
 

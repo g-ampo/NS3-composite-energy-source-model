@@ -1,0 +1,27 @@
+# -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
+#
+# Legacy waf build script for ns-3 <= 3.35.
+# For ns-3 >= 3.36, CMakeLists.txt is used instead.
+
+
+def build(bld):
+    module = bld.create_ns3_module('composite-energy', ['core', 'network', 'energy'])
+    module.source = [
+        'model/composite-energy-source.cc',
+    ]
+
+    module_test = bld.create_ns3_module_test_library('composite-energy')
+    module_test.source = [
+        'test/composite-energy-source-test-suite.cc',
+    ]
+
+    headers = bld(features='ns3header')
+    headers.module = 'composite-energy'
+    headers.source = [
+        'model/composite-energy-source.h',
+    ]
+
+    if bld.env['ENABLE_EXAMPLES']:
+        bld.recurse('examples')
+
+    bld.ns3_python_bindings()

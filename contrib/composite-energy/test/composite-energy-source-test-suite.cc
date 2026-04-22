@@ -1,8 +1,6 @@
-// tests/energy/test-composite-energy-source.cc
-
-#include "ns3/test.h"
-#include "CompositeEnergySource.h"
+#include "ns3/composite-energy-source.h"
 #include "ns3/simulator.h"
+#include "ns3/test.h"
 
 using namespace ns3;
 

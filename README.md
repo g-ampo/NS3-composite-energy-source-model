@@ -16,50 +16,41 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
 
 ### Prerequisites
 
-- **ns-3:** Version 3.30 or later.
-- **C++ Compiler:** Compatible with ns-3 requirements.
-- **Build Tools:** `waf`, `g++`, `make`, etc.
+- **ns-3:** Version 3.36 or later (CMake build). Versions 3.30–3.35 supported via legacy `wscript` (waf).
+- **C++ Compiler:** C++17 (as required by the target ns-3 release).
+- **Build Tools:** CMake ≥ 3.13 and the `./ns3` wrapper (or `waf` on older releases).
 - **Git:** For cloning the repository.
 
 ### Steps
 
-1. **Clone the Repository:**
+1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/g-ampo/ns3-composite-energy-model.git
-   cd ns3-composite-energy-model
+   git clone https://github.com/g-ampo/NS3-composite-energy-source-model.git
    ```
 
-2. **Integrate with ns-3:**
-
-   Copy the `src/`, `examples/`, and other directories into your ns-3 installation's root directory.
+2. **Drop the module into your ns-3 tree as a contrib module:**
 
    ```bash
-   cp -r src/ <path-to-ns3>/src/
-   cp -r examples/ <path-to-ns3>/examples/
-   cp -r tests/ <path-to-ns3>/tests/
-   cp -r docs/ <path-to-ns3>/docs/
-   cp -r scripts/ <path-to-ns3>/scripts/
-   cp -r .github/ <path-to-ns3>/.github/
+   cp -r NS3-composite-energy-source-model/contrib/composite-energy <path-to-ns-3-dev>/contrib/
    ```
 
-3. **Update `wscript`:** (waf)
+   The module is self-contained — nothing else needs to be copied, and no
+   existing ns-3 file needs to be edited.
 
-   Ensure that ns-3 recognizes the new energy models by updating the `wscript` file in the `src/energy/` directory.
+3. **Configure and build (ns-3 ≥ 3.36, CMake):**
 
-   ```python
-   # src/energy/wscript
+   ```bash
+   cd <path-to-ns-3-dev>
+   ./ns3 configure --enable-examples --enable-tests
+   ./ns3 build
+   ```
 
-   def build(bld):
-        # Add the new composite energy source into the existing energy library
-        bld.source += [ 'src/energy/CompositeEnergySource.cc' ]
-        bld.includes += [ 'src/energy' ]
+   Legacy waf (ns-3 ≤ 3.35):
 
-       bld.ns3_add_executable("composite-energy-model-example",
-                              ["../examples/energy/composite-energy-model-example.cc"],
-                              ["energy"],
-                              includes=["../examples/energy"],
-                              )
+   ```bash
+   ./waf configure --enable-examples --enable-tests
+   ./waf build
    ```
 
 4. **Attributes (LEO cycle):**
@@ -76,21 +67,17 @@ This project implements a **Composite Energy Model** within the **ns-3** simulat
 
    Alternatively, a fixed harvesting window can be set via `AddSolarPanelWindow(powerJps, start, end)` with `UseLeoCycle=false`.
 
-5. **Build the Project:**
-
-   Navigate to the ns-3 root directory and build the project.
+5. **Run the example simulation:**
 
    ```bash
-   ./waf configure --enable-examples --enable-tests
-   ./waf build
+   ./ns3 run composite-energy-model-example
    ```
 
-6. **Run Example Simulations:**
-
-   Execute the example simulation to verify the setup.
+   Legacy waf:
 
    ```bash
-   ./waf --run energy/composite-energy-model-example
+   ./waf --run composite-energy-model-example
+   ```
 
 ### Class Diagram
 
@@ -135,8 +122,8 @@ This section provides an overview of each class within the project, detailing th
 
 #### CompositeEnergySource
 
-- **Header File:** `src/energy/CompositeEnergySource.h`
-- **Source File:** `src/energy/CompositeEnergySource.cc`
+- **Header File:** `contrib/composite-energy/model/composite-energy-source.h`
+- **Source File:** `contrib/composite-energy/model/composite-energy-source.cc`
 - **Inheritance:** Inherits from `ns3::LiIonEnergySource`.
 - **Description:** 
   The `CompositeEnergySource` class is a Li-Ion energy source that adds solar harvesting. Satellites can replenish energy via LEO sunlight/shadow cycles or a fixed window. Discharge/voltage/capacity remain handled by the base Li-Ion implementation, while harvesting injects energy using `ChangeRemainingEnergy(+J)`.
@@ -159,7 +146,7 @@ This section provides an overview of each class within the project, detailing th
 
 #### CompositeEnergySourceTest
 
-- **Header File:** `tests/energy/test-composite-energy-source.cc`
+- **Source File:** `contrib/composite-energy/test/composite-energy-source-test-suite.cc`
 - **Inheritance:** Inherits from `ns3::TestCase`.
 - **Description:**
   The `CompositeEnergySourceTest` class contains unit tests designed to verify the correctness and reliability of the `CompositeEnergySource` implementation. It tests functionalities such as energy harvesting, correct energy addition over time, and proper integration with the battery component.
@@ -174,7 +161,13 @@ This section provides an overview of each class within the project, detailing th
 To execute the unit tests and ensure that all components are functioning correctly:
 
 ```bash
-./waf --run test-composite-energy-source
+./ns3 run "test-runner --suite=composite-energy-source"
+```
+
+Legacy waf:
+
+```bash
+./waf --run "test-runner --suite=composite-energy-source"
 ```
 ---
 

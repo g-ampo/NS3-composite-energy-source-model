@@ -1,14 +1,8 @@
-// CompositeEnergySource.h
+#ifndef NS3_COMPOSITE_ENERGY_SOURCE_H
+#define NS3_COMPOSITE_ENERGY_SOURCE_H
 
-#ifndef COMPOSITE_ENERGY_SOURCE_H
-#define COMPOSITE_ENERGY_SOURCE_H
-
-#include "ns3/li-ion-energy-source.h"
 #include "ns3/event-id.h"
-#include "ns3/simulator.h"
-#include "ns3/double.h"
-#include "ns3/boolean.h"
-#include "ns3/nstime.h"
+#include "ns3/li-ion-energy-source.h"
 
 namespace ns3 {
 
@@ -84,4 +78,4 @@ private:
 
 } // namespace ns3
 
-#endif // COMPOSITE_ENERGY_SOURCE_H
+#endif // NS3_COMPOSITE_ENERGY_SOURCE_H
