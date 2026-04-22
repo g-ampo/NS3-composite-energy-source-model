@@ -176,6 +176,12 @@ This section provides an overview of each class within the project, detailing th
 
 ## Additional Information
 
+### Documentation
+
+Full Sphinx-style module documentation is at
+[`contrib/composite-energy/doc/composite-energy.rst`](contrib/composite-energy/doc/composite-energy.rst).
+It covers the model rationale, mode precedence (pluggable irradiance > LEO > fixed window), all attributes and trace sources, and validation coverage. To build it as part of the |ns3| docs, symlink or include the rst from your ns-3 tree's `doc/models/source/index.rst`.
+
 ### Running Tests
 
 To execute the unit tests and ensure that all components are functioning correctly:

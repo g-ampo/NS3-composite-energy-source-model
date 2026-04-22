@@ -11,7 +11,7 @@ namespace ns3
 class EnergySource;
 
 /**
- * \ingroup energy
+ * \ingroup composite-energy
  * \brief DeviceEnergyModel that injects solar-harvested energy into an
  *        ns-3 EnergySource by reporting a *negative* current draw.
  *

@@ -12,7 +12,20 @@ namespace ns3
 {
 
 /**
- * \ingroup energy
+ * \defgroup composite-energy Composite Energy Source
+ * \brief Li-Ion battery with pluggable solar harvesting for ns-3.
+ *
+ * Drop-in contrib module that extends ns-3's LiIonEnergySource with
+ * attribute-driven solar energy harvesting (built-in LEO cycle and
+ * fixed-window modes, plus a pluggable SolarIrradianceModel slot for
+ * user-supplied irradiance profiles such as orbit propagators, eclipse
+ * geometry, pointing models or CSV traces). Adds CC-CV voltage
+ * clamping, a lumped ChargeEfficiency, and a HarvestedPower trace
+ * source.
+ */
+
+/**
+ * \ingroup composite-energy
  * \brief Li-Ion battery with optional solar energy harvesting.
  *
  * Design
