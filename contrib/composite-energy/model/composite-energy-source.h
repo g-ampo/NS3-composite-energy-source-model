@@ -6,6 +6,7 @@
 
 #include "ns3/event-id.h"
 #include "ns3/li-ion-energy-source.h"
+#include "ns3/traced-value.h"
 
 namespace ns3
 {
@@ -106,8 +107,14 @@ class CompositeEnergySource : public LiIonEnergySource
     double m_harvestIntervalSeconds;
     double m_sunlightSeconds;
     double m_shadowSeconds;
-    double m_maxEnergyJ; // 0 => use GetInitialEnergy() as the cap
+    double m_maxEnergyJ;         // 0 => use GetInitialEnergy() as the cap
+    double m_maxChargeVoltageV;  // 0 => disabled; else stop harvest when V >= this
+    double m_chargeEfficiency;   // in [0,1], applied to harvested power
     bool m_inSunlight;
+
+    // Instantaneous harvested power in W, after efficiency and CC-CV clamp.
+    // Exposed as the "HarvestedPower" trace source.
+    TracedValue<double> m_harvestedPowerW;
 
     EventId m_harvestEvent;
     EventId m_toggleEvent;

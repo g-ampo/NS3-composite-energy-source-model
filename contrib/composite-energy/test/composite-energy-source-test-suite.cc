@@ -164,6 +164,78 @@ class CompositeEnergySourceIrradianceModelTest : public TestCase
     }
 };
 
+/**
+ * ChargeEfficiency test: a lumped 50% efficiency must halve the energy
+ * injected into the battery for the same irradiance profile.
+ */
+class CompositeEnergySourceChargeEfficiencyTest : public TestCase
+{
+  public:
+    CompositeEnergySourceChargeEfficiencyTest()
+        : TestCase("CompositeEnergySource ChargeEfficiency applies to injected power")
+    {
+    }
+
+    void DoRun() override
+    {
+        Ptr<CompositeEnergySource> source = CreateObject<CompositeEnergySource>();
+        source->SetAttribute("InitialEnergyJ", DoubleValue(2000.0));
+        source->SetAttribute("MaxEnergyJ", DoubleValue(10000.0));
+        source->SetAttribute("UseLeoCycle", BooleanValue(false));
+        source->SetAttribute("ChargeEfficiency", DoubleValue(0.5));
+        source->AddSolarPanelWindow(500.0, 0.0, 10.0);
+        source->Initialize();
+
+        Simulator::Stop(Seconds(11.0));
+        Simulator::Run();
+        double harvested = source->GetTotalHarvestedEnergy();
+        source->Dispose();
+        Simulator::Destroy();
+
+        // 500 W * 10 s * 0.5 = 2500 J.
+        NS_TEST_ASSERT_MSG_EQ_TOL(harvested,
+                                  2500.0,
+                                  1.0,
+                                  "efficiency should halve injected energy");
+    }
+};
+
+/**
+ * CC-CV clamp test: setting MaxChargeVoltageV below the initial cell
+ * voltage must prevent any harvesting from occurring.
+ */
+class CompositeEnergySourceVoltageClampTest : public TestCase
+{
+  public:
+    CompositeEnergySourceVoltageClampTest()
+        : TestCase("CompositeEnergySource MaxChargeVoltageV stops harvest at limit")
+    {
+    }
+
+    void DoRun() override
+    {
+        Ptr<CompositeEnergySource> source = CreateObject<CompositeEnergySource>();
+        source->SetAttribute("InitialEnergyJ", DoubleValue(2000.0));
+        source->SetAttribute("MaxEnergyJ", DoubleValue(10000.0));
+        source->SetAttribute("UseLeoCycle", BooleanValue(false));
+        source->SetAttribute("InitialCellVoltage", DoubleValue(4.0));
+        source->SetAttribute("MaxChargeVoltageV", DoubleValue(3.0));
+        source->AddSolarPanelWindow(500.0, 0.0, 10.0);
+        source->Initialize();
+
+        Simulator::Stop(Seconds(11.0));
+        Simulator::Run();
+        double harvested = source->GetTotalHarvestedEnergy();
+        source->Dispose();
+        Simulator::Destroy();
+
+        NS_TEST_ASSERT_MSG_EQ_TOL(harvested,
+                                  0.0,
+                                  1e-9,
+                                  "voltage clamp should block all harvesting");
+    }
+};
+
 class CompositeEnergySourceTestSuite : public TestSuite
 {
   public:
@@ -173,6 +245,8 @@ class CompositeEnergySourceTestSuite : public TestSuite
         AddTestCase(new CompositeEnergySourceFixedWindowTest, TestCase::Duration::QUICK);
         AddTestCase(new CompositeEnergySourceLeoCycleTest, TestCase::Duration::QUICK);
         AddTestCase(new CompositeEnergySourceIrradianceModelTest, TestCase::Duration::QUICK);
+        AddTestCase(new CompositeEnergySourceChargeEfficiencyTest, TestCase::Duration::QUICK);
+        AddTestCase(new CompositeEnergySourceVoltageClampTest, TestCase::Duration::QUICK);
     }
 };
 

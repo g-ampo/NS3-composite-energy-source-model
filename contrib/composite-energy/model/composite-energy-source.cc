@@ -78,7 +78,28 @@ CompositeEnergySource::GetTypeId()
                           "SunlightSeconds, ShadowSeconds and AddSolarPanelWindow() API.",
                           PointerValue(),
                           MakePointerAccessor(&CompositeEnergySource::m_irradianceModel),
-                          MakePointerChecker<SolarIrradianceModel>());
+                          MakePointerChecker<SolarIrradianceModel>())
+            .AddAttribute("MaxChargeVoltageV",
+                          "Per-cell voltage ceiling (V). Harvest current is clamped to zero "
+                          "once GetSupplyVoltage() reaches this value. Approximates the "
+                          "transition from the CC (constant-current) phase to the CV "
+                          "(constant-voltage) phase of a Li-Ion charge cycle. A value of 0 "
+                          "(default) disables the clamp.",
+                          DoubleValue(0.0),
+                          MakeDoubleAccessor(&CompositeEnergySource::m_maxChargeVoltageV),
+                          MakeDoubleChecker<double>(0.0))
+            .AddAttribute("ChargeEfficiency",
+                          "Round-trip efficiency applied to harvested power before it is "
+                          "injected into the battery. Use this to model MPPT/regulator "
+                          "losses and Li-Ion coulombic inefficiency in a single lumped term.",
+                          DoubleValue(1.0),
+                          MakeDoubleAccessor(&CompositeEnergySource::m_chargeEfficiency),
+                          MakeDoubleChecker<double>(0.0, 1.0))
+            .AddTraceSource("HarvestedPower",
+                            "Instantaneous harvested power (W) injected into the battery, "
+                            "after efficiency and CC-CV clamps.",
+                            MakeTraceSourceAccessor(&CompositeEnergySource::m_harvestedPowerW),
+                            "ns3::TracedValueCallback::Double");
     return tid;
 }
 
@@ -95,7 +116,10 @@ CompositeEnergySource::CompositeEnergySource()
       m_sunlightSeconds(3900.0),
       m_shadowSeconds(1800.0),
       m_maxEnergyJ(0.0),
-      m_inSunlight(true)
+      m_maxChargeVoltageV(0.0),
+      m_chargeEfficiency(1.0),
+      m_inSunlight(true),
+      m_harvestedPowerW(0.0)
 {
     NS_LOG_FUNCTION(this);
 }
@@ -239,6 +263,24 @@ CompositeEnergySource::UpdateHarvestCurrent()
     }
 
     double v = GetSupplyVoltage();
+
+    // CC-CV clamp: stop injecting once the cell voltage reaches the
+    // configured ceiling.
+    if (m_maxChargeVoltageV > 0.0 && v >= m_maxChargeVoltageV)
+    {
+        harvestPowerW = 0.0;
+    }
+
+    // Efficiency is a lumped loss covering MPPT / regulator / coulombic
+    // inefficiency. It attenuates the injected power, not the irradiance.
+    harvestPowerW *= m_chargeEfficiency;
+
+    // TracedValue fires on every assignment; use '=' only on actual change.
+    if (harvestPowerW != m_harvestedPowerW)
+    {
+        m_harvestedPowerW = harvestPowerW;
+    }
+
     double harvestCurrentA = (harvestPowerW > 0.0 && v > 0.0) ? (harvestPowerW / v) : 0.0;
     m_harvester->SetHarvestCurrentA(harvestCurrentA);
 
