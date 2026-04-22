@@ -10,8 +10,10 @@ build_lib(
   LIBNAME composite-energy
   SOURCE_FILES
     model/composite-energy-source.cc
+    model/solar-harvester-device-model.cc
   HEADER_FILES
     model/composite-energy-source.h
+    model/solar-harvester-device-model.h
   LIBRARIES_TO_LINK
     ${libcore}
     ${libnetwork}

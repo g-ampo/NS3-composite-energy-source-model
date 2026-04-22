@@ -1,79 +1,109 @@
 #ifndef NS3_COMPOSITE_ENERGY_SOURCE_H
 #define NS3_COMPOSITE_ENERGY_SOURCE_H
 
+#include "solar-harvester-device-model.h"
+
 #include "ns3/event-id.h"
 #include "ns3/li-ion-energy-source.h"
 
-namespace ns3 {
+namespace ns3
+{
 
 /**
- * \brief CompositeEnergySource: Li-Ion battery with solar harvesting staged for LEO.
+ * \ingroup energy
+ * \brief Li-Ion battery with optional solar energy harvesting.
  *
- * Design intent
- *  - Inherit from ns3::LiIonEnergySource so that existing ns-3 DeviceEnergyModel
- *    classes can attach directly to this source without any adapter.
- *  - Add attribute-driven solar harvesting that operates either via a repeating
- *    sunlight/shadow (LEO) cycle or via a fixed-time harvesting window.
- *  - Leverage the Li-Ion model for discharge dynamics, voltage, capacity, and
- *    current/energy accounting, while this subclass only injects harvested energy.
+ * Design
+ *  - Inherits from ns3::LiIonEnergySource so that any existing
+ *    DeviceEnergyModel can attach to this source without an adapter and
+ *    so that the full Li-Ion discharge / Shepherd-voltage model is
+ *    preserved verbatim.
+ *  - Harvesting is expressed as a negative current reported by an
+ *    internal SolarHarvesterDeviceModel. The Li-Ion integrator already
+ *    sums device currents to compute net I*V*dt; a negative contribution
+ *    therefore adds energy exactly, with no need to reach inside the
+ *    private remaining-energy state of the base class.
  *
- * Usage
- *  - Create a CompositeEnergySource, set Li-Ion attributes (InitialEnergyJ, CapacityJ,
- *    voltages, internal resistance, etc.), then set harvesting attributes.
- *  - Attach a DeviceEnergyModel (e.g., SimpleDeviceEnergyModel) directly to this source
- *    with SetEnergySource(this) and install it on the node.
+ * Harvesting modes
+ *  - LEO cycle (UseLeoCycle=true, default): alternating
+ *    SunlightSeconds / ShadowSeconds phases. Instantaneous solar input
+ *    power P = SolarConstantWm2 * PanelAreaM2 * PanelEfficiency.
+ *  - Fixed window (UseLeoCycle=false): constant P in [start, end)
+ *    specified via AddSolarPanelWindow(P, start, end).
  *
- * Notes
- *  - Harvesting adds energy using ChangeRemainingEnergy(+J), while consumption is
- *    handled by the base Li-Ion class (invoked by DeviceEnergyModel execution).
- *  - If UseLeoCycle is true, the fixed AddSolarPanelWindow() is ignored.
+ * Clamping
+ *  - When the remaining energy reaches InitialEnergyJ (full charge) the
+ *    harvester current is driven to zero. This avoids unphysical
+ *    over-filling of the cell in either harvesting mode.
  */
 class CompositeEnergySource : public LiIonEnergySource
 {
-public:
-  static TypeId GetTypeId (void);
-  
-  CompositeEnergySource ();
-  virtual ~CompositeEnergySource ();
+  public:
+    static TypeId GetTypeId();
 
-  /**
-   * \brief Configure a fixed harvesting window (ignored when UseLeoCycle=true).
-   *        The source will add energy at a constant power (J/s) in [start,end).
-   */
-  void AddSolarPanelWindow (double powerJoulePerSecond, double startTime, double endTime);
+    CompositeEnergySource();
+    ~CompositeEnergySource() override;
 
-  /**
-   * \brief Configure a solar harvester using panel area and efficiency.
-   *        Instantaneous solar input power (J/s) = SolarConstantWm2 * PanelAreaM2 * PanelEfficiency.
-   */
-  void ConfigureSolarHarvester (double panelAreaM2, double panelEfficiency, double solarConstantWm2 = 1361.0);
-  
-  // Li-Ion energy accounting and voltage are handled by the base class.
+    /**
+     * \brief Configure a fixed harvesting window.
+     *
+     * Only effective when UseLeoCycle=false. The source injects energy at
+     * constant power \p powerJoulePerSecond (W) during [startTime, endTime).
+     */
+    void AddSolarPanelWindow(double powerJoulePerSecond, double startTime, double endTime);
 
-private:
-  // ns-3 lifecycle
-  void DoInitialize () override;
+    /**
+     * \brief Configure the LEO solar harvester from panel geometry.
+     *
+     * Instantaneous solar input power during sunlight is
+     * P = solarConstantWm2 * panelAreaM2 * panelEfficiency.
+     */
+    void ConfigureSolarHarvester(double panelAreaM2,
+                                 double panelEfficiency,
+                                 double solarConstantWm2 = 1361.0);
 
-  // Harvesting loop and cycle management
-  void HarvestEnergy ();
-  void StartHarvestCycle ();
-  void ToggleSunlight (); // switch sunlight/shadow in LEO cycle
+    /** \return Total energy harvested since start of simulation, in Joules. */
+    double GetTotalHarvestedEnergy() const;
 
-  double m_solarPower;                  ///< Explicit harvested power (J/s)
-  EventId m_harvestEvent;               ///< Event ID for harvesting
-  double m_harvestStart;                ///< Harvest start time (s) for explicit window
-  double m_harvestEnd;                  ///< Harvest end time (s) for explicit window
+    /** \return true if the current LEO phase is sunlight. Always true when
+     *           using a fixed window (no phase concept). */
+    bool IsInSunlight() const;
 
-  // Attribute-driven LEO cycle and harvester parameters
-  bool   m_useLeoCycle;                 ///< Use repeating sunlight/shadow cycle
-  double m_panelAreaM2;                 ///< Solar panel area (m^2)
-  double m_panelEfficiency;             ///< Panel efficiency (0..1)
-  double m_solarConstantWm2;            ///< Solar constant (W/m^2)
-  double m_harvestIntervalSeconds;      ///< Integration step (s)
-  double m_sunlightSeconds;             ///< Sunlight duration per orbit segment (s)
-  double m_shadowSeconds;               ///< Shadow (umbra) duration (s)
-  bool   m_inSunlight;                  ///< Current cycle state
-  EventId m_toggleEvent;                ///< Event to toggle sunlight/shadow
+  protected:
+    void DoInitialize() override;
+    void DoDispose() override;
+
+  private:
+    /** Recompute the harvest current from current mode/phase and apply it
+     *  to the internal harvester device model. Reschedules itself every
+     *  HarvestIntervalSeconds. */
+    void UpdateHarvestCurrent();
+
+    /** Flip the LEO sunlight/shadow phase and reschedule the next toggle. */
+    void ToggleSunlight();
+
+    // Harvesting device model driven by this source (reports negative
+    // current to the Li-Ion integrator).
+    Ptr<SolarHarvesterDeviceModel> m_harvester;
+
+    // Fixed-window parameters
+    double m_windowPowerW;
+    double m_windowStart;
+    double m_windowEnd;
+
+    // LEO / harvester attributes
+    bool m_useLeoCycle;
+    double m_panelAreaM2;
+    double m_panelEfficiency;
+    double m_solarConstantWm2;
+    double m_harvestIntervalSeconds;
+    double m_sunlightSeconds;
+    double m_shadowSeconds;
+    double m_maxEnergyJ; // 0 => use GetInitialEnergy() as the cap
+    bool m_inSunlight;
+
+    EventId m_harvestEvent;
+    EventId m_toggleEvent;
 };
 
 } // namespace ns3

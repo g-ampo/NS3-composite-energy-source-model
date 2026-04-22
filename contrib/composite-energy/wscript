@@ -8,6 +8,7 @@ def build(bld):
     module = bld.create_ns3_module('composite-energy', ['core', 'network', 'energy'])
     module.source = [
         'model/composite-energy-source.cc',
+        'model/solar-harvester-device-model.cc',
     ]
 
     module_test = bld.create_ns3_module_test_library('composite-energy')
@@ -19,6 +20,7 @@ def build(bld):
     headers.module = 'composite-energy'
     headers.source = [
         'model/composite-energy-source.h',
+        'model/solar-harvester-device-model.h',
     ]
 
     if bld.env['ENABLE_EXAMPLES']:
