@@ -1,7 +1,10 @@
 #include "ns3/boolean.h"
+#include "ns3/callback.h"
 #include "ns3/composite-energy-source.h"
 #include "ns3/double.h"
+#include "ns3/pointer.h"
 #include "ns3/simulator.h"
+#include "ns3/solar-irradiance-model.h"
 #include "ns3/test.h"
 
 using namespace ns3;
@@ -112,6 +115,55 @@ class CompositeEnergySourceLeoCycleTest : public TestCase
     }
 };
 
+/**
+ * Callback-driven irradiance test: verifies that a user-supplied
+ * SolarIrradianceModel overrides the built-in LEO logic. The callback
+ * returns 1000 W/m^2 for the first 5 s and 0 thereafter; with
+ * Area=2, Eff=0.5 the harvest power during the active window is
+ * 1000 * 2 * 0.5 = 1000 W, so after 6 s we expect 5000 J harvested.
+ */
+static double
+TestIrradianceRamp(Time t)
+{
+    return t.GetSeconds() < 5.0 ? 1000.0 : 0.0;
+}
+
+class CompositeEnergySourceIrradianceModelTest : public TestCase
+{
+  public:
+    CompositeEnergySourceIrradianceModelTest()
+        : TestCase("CompositeEnergySource with pluggable IrradianceModel")
+    {
+    }
+
+    void DoRun() override
+    {
+        Ptr<CallbackSolarIrradianceModel> model = CreateObject<CallbackSolarIrradianceModel>();
+        model->SetCallback(MakeCallback(&TestIrradianceRamp));
+
+        Ptr<CompositeEnergySource> source = CreateObject<CompositeEnergySource>();
+        source->SetAttribute("InitialEnergyJ", DoubleValue(1000.0));
+        source->SetAttribute("MaxEnergyJ", DoubleValue(100000.0));
+        source->SetAttribute("UseLeoCycle", BooleanValue(true)); // should be overridden
+        source->SetAttribute("PanelAreaM2", DoubleValue(2.0));
+        source->SetAttribute("PanelEfficiency", DoubleValue(0.5));
+        source->SetAttribute("IrradianceModel", PointerValue(model));
+        source->Initialize();
+
+        Simulator::Stop(Seconds(6.0));
+        Simulator::Run();
+        double harvested = source->GetTotalHarvestedEnergy();
+        source->Dispose();
+        Simulator::Destroy();
+
+        // 1000 W for 5 s = 5000 J.
+        NS_TEST_ASSERT_MSG_EQ_TOL(harvested,
+                                  5000.0,
+                                  1.0,
+                                  "callback irradiance harvest amount");
+    }
+};
+
 class CompositeEnergySourceTestSuite : public TestSuite
 {
   public:
@@ -120,6 +172,7 @@ class CompositeEnergySourceTestSuite : public TestSuite
     {
         AddTestCase(new CompositeEnergySourceFixedWindowTest, TestCase::Duration::QUICK);
         AddTestCase(new CompositeEnergySourceLeoCycleTest, TestCase::Duration::QUICK);
+        AddTestCase(new CompositeEnergySourceIrradianceModelTest, TestCase::Duration::QUICK);
     }
 };
 

@@ -2,6 +2,7 @@
 #define NS3_COMPOSITE_ENERGY_SOURCE_H
 
 #include "solar-harvester-device-model.h"
+#include "solar-irradiance-model.h"
 
 #include "ns3/event-id.h"
 #include "ns3/li-ion-energy-source.h"
@@ -85,6 +86,12 @@ class CompositeEnergySource : public LiIonEnergySource
     // Harvesting device model driven by this source (reports negative
     // current to the Li-Ion integrator).
     Ptr<SolarHarvesterDeviceModel> m_harvester;
+
+    // Optional user-supplied irradiance model. When non-null, its
+    // GetPowerDensityWm2(t) replaces the built-in LEO/window logic as the
+    // sole source of harvesting power. PanelAreaM2 and PanelEfficiency
+    // continue to be applied as multipliers in both paths.
+    Ptr<SolarIrradianceModel> m_irradianceModel;
 
     // Fixed-window parameters
     double m_windowPowerW;

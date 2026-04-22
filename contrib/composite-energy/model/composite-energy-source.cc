@@ -4,6 +4,7 @@
 #include "ns3/double.h"
 #include "ns3/log.h"
 #include "ns3/nstime.h"
+#include "ns3/pointer.h"
 #include "ns3/simulator.h"
 
 namespace ns3
@@ -67,7 +68,17 @@ CompositeEnergySource::GetTypeId()
                           "a full cell).",
                           DoubleValue(0.0),
                           MakeDoubleAccessor(&CompositeEnergySource::m_maxEnergyJ),
-                          MakeDoubleChecker<double>(0.0));
+                          MakeDoubleChecker<double>(0.0))
+            .AddAttribute("IrradianceModel",
+                          "Optional pluggable SolarIrradianceModel. When non-null, its "
+                          "GetPowerDensityWm2(t) replaces the built-in LEO/window logic as "
+                          "the sole source of harvesting power. PanelAreaM2 and "
+                          "PanelEfficiency continue to be applied as multipliers. Leave "
+                          "unset to keep the built-in behaviour driven by the UseLeoCycle, "
+                          "SunlightSeconds, ShadowSeconds and AddSolarPanelWindow() API.",
+                          PointerValue(),
+                          MakePointerAccessor(&CompositeEnergySource::m_irradianceModel),
+                          MakePointerChecker<SolarIrradianceModel>());
     return tid;
 }
 
@@ -147,7 +158,10 @@ CompositeEnergySource::DoInitialize()
     // transitions.
     m_harvestEvent = Simulator::ScheduleNow(&CompositeEnergySource::UpdateHarvestCurrent, this);
 
-    if (m_useLeoCycle)
+    // The built-in LEO toggle is only useful when the pluggable irradiance
+    // model is not in use; the model, if set, drives phase transitions
+    // itself through its GetPowerDensityWm2() output.
+    if (m_useLeoCycle && !m_irradianceModel)
     {
         m_inSunlight = true;
         m_toggleEvent = Simulator::Schedule(Seconds(m_sunlightSeconds),
@@ -200,7 +214,14 @@ CompositeEnergySource::UpdateHarvestCurrent()
     double harvestPowerW = 0.0;
     if (!full)
     {
-        if (m_useLeoCycle)
+        if (m_irradianceModel)
+        {
+            // Pluggable model wins over built-in modes; panel geometry and
+            // efficiency still apply as multipliers.
+            double density = m_irradianceModel->GetPowerDensityWm2(Simulator::Now());
+            harvestPowerW = density * m_panelAreaM2 * m_panelEfficiency;
+        }
+        else if (m_useLeoCycle)
         {
             if (m_inSunlight)
             {
